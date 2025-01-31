@@ -107,7 +107,7 @@ class ElectricityMarket(Model):
         """Advance model by one step"""
         # telemetry back to the caller:
         if self.step_count % 100 == 0:
-            print(f"Time: {self.step_count}, Demand: {N}")
+            print(f"Time: {self.step_count}")
 
         # commented code from the source notebook will have two hashes, like the following:
         ##      N = rng.uniform(int(np.mean(capacities)), int(np.sum(capacities)))
@@ -116,7 +116,8 @@ class ElectricityMarket(Model):
         )
 
         # the agent generate bids line:
-        ##      bids = generate_bids(n, N, mechanism, capacity_expectations, cost_expectations, expected_rankings, padding, costs)
+        ##      bids = generate_bids(n, N, mechanism, capacity_expectations, 
+        ##          cost_expectations, expected_rankings, padding, costs)
 
         # recall that n is the number of agents, and N is the random demand we just generated
         # instead of a function call within our model, we will run the step to our agents:

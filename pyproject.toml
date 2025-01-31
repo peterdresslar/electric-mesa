@@ -23,11 +23,15 @@ build-backend = "hatchling.build"
 packages = ["."]
 
 [tool.ruff]
-line-length = 96
+line-length = 88  # Back to standard for code
 target-version = "py312"
 exclude = ["tests", "docs", "notebooks"]
 
 [tool.ruff.lint]
 select = ["E", "F", "B", "I"]
+
+# Allow longer comments
+[tool.ruff.lint.pycodestyle]
+max-doc-length = 100
 
 

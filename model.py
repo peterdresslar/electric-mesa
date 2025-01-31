@@ -137,21 +137,18 @@ class ElectricityMarket(Model):
             # now we need to calculate the revenue for each agent:
             ##     revenues, profits = outcomes(mechanism, last_price, bids, quantities, costs)
 
-            outcome = agent.outcomes(
+            revenues, profits = agent.outcomes(
                 self.mechanism, last_price, bids[i], quantities[i], self.costs[i]
             )
 
             # And then finally we need to clean up into our result arrays:
             ##     RTO_costs[s] = sum(revenues)
             ##     GenCo_profits[s] = profits
-            # We will leave that in the agent code.
 
-            self.RTO_costs[self.step_count] += outcome["revenue"]  # Accumulate revenues
-            self.GenCo_profits[self.step_count, i] = outcome[
-                "profit"
-            ]  # Store individual profit
+            self.RTO_costs[self.step_count] += revenues  # Accumulate revenues
+            self.GenCo_profits[self.step_count, i] = profits  # Store individual profit
 
-            agent.update(outcome)
+            agent.update_outcomes((revenues, profits))
 
         self.step_count += 1
 

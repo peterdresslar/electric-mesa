@@ -1,5 +1,6 @@
-from mesa import Agent
 import numpy as np
+from mesa import Agent
+
 
 class GenCoAgent(Agent):
     """Generator Company agent that participates in electricity auctions"""
@@ -21,9 +22,16 @@ class GenCoAgent(Agent):
         self.revenue = 0
         self.profit = 0
         self.quantity_supplied = 0
-        self.outcomes = None
+        self.outcomes = []
         
-    def generate_bid(self, mechanism, N, capacity_expectations, cost_expectations, expected_rankings, padding, costs):
+    def generate_bid(self, 
+                     mechanism, 
+                     N, 
+                     capacity_expectations, 
+                     cost_expectations, 
+                     expected_rankings, 
+                     padding, 
+                     costs):
         """Generate bid based on mechanism type and demand"""
         # this function is the ALMOST the same as the one in the source notebook
         # we have slightly changed the function signature to match the agent's 
@@ -79,7 +87,7 @@ class GenCoAgent(Agent):
         """Run auction and return quantities and last price"""
         # this function is the same as the one in the source notebook
         request = N
-        quantities = np.zeros(n)
+        quantities = np.zeros(self.model.n) # slightly changed to get the number of agents
         bid_ranking = np.argsort(bids)
         for i in bid_ranking:
             if request > 0:
@@ -105,6 +113,6 @@ class GenCoAgent(Agent):
         return(revenues, profits)
 
     # NOT from the source notebook, this plugs the outcome into the "body" of the agent.
-    def update(self, outcome: tuple):
+    def update_outcomes(self, revenues, profits):
         """Update agent's revenue and profit"""
-        self.outcomes.append(outcome)
+        self.outcomes.append((revenues, profits))

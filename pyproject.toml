@@ -23,7 +23,7 @@ build-backend = "hatchling.build"
 packages = ["."]
 
 [tool.ruff]
-line-length = 88
+line-length = 96
 target-version = "py312"
 exclude = ["tests", "docs", "notebooks"]
 

@@ -12,7 +12,9 @@ class GenCoAgent(Agent):
         cost: float,
         capacity: float,
         error_factors: np.ndarray,
-        padding: float
+        padding: float,
+        price_cap: float,
+        mechanism: str
     ):
         super().__init__(unique_id, model)
         self.cost = cost

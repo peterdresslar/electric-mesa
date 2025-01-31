@@ -68,14 +68,17 @@ class ElectricityMarket(Model):
         # Create agents
         for i_n in range(self.n):
             agent = GenCoAgent(
-                i_n,
-                self,
-                self.costs[i_n],
-                self.capacities[i_n],
-                errors[i_n],
-                paddings[i_n],
+                unique_id=i_n,
+                model=self,
+                cost=self.costs[i_n],
+                capacity=self.capacities[i_n],
+                error_factors=errors[i_n],
+                padding=paddings[i_n],
+                price_cap=self.price_cap,  # Add model-level params
+                mechanism=self.mechanism,
             )
             self.register_agent(agent)
+
 
         self.running = True
         self.datacollector = None  # We can add this later for data collection
@@ -125,9 +128,8 @@ class ElectricityMarket(Model):
         bids = np.zeros(self.n)
 
         for i, agent in enumerate(self.agents):
-            bids[i] = agent.generate_bid(
-                self.mechanism, N
-            )  # note that all of our other params were initialized in the agent constructor
+            # note that all of our other params were initialized in the agent constructor:
+            bids[i] = agent.generate_bid(N)  
 
             # now we need to run the auction:
             ##     quantities, last_price = auction(N, bids, capacities)
@@ -138,8 +140,10 @@ class ElectricityMarket(Model):
             ##     revenues, profits = outcomes(mechanism, last_price, bids, quantities, costs)
 
             revenues, profits = agent.outcomes(
-                self.mechanism, last_price, bids[i], quantities[i], self.costs[i]
-            )
+                last_price=last_price,
+                bid=bids[i],
+                quantity=quantities[i]
+            )  # This line is pretty tricky, since we have a different cardinality of params
 
             # And then finally we need to clean up into our result arrays:
             ##     RTO_costs[s] = sum(revenues)

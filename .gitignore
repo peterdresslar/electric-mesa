@@ -1,0 +1,19 @@
+# Python build artifacts
+__pycache__/
+*.py[cod]
+*.so
+build/
+dist/
+*.egg-info/
+
+# UV specific
+.uv/
+.venv/
+
+# IDE specific (common ones)
+.vscode/
+.idea/
+
+# OS specific
+.DS_Store
+Thumbs.db

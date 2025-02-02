@@ -193,7 +193,7 @@ class ElectricityMarket(Model):
 
         # let agents record their individual results
         for i_n, agent in enumerate(self.agents):
-            agent.update_outcomes(revenues[i_n], profits[i_n])
+            agent.update_outcomes(revenues, profits)
 
         self.step_count += 1
 
@@ -205,6 +205,7 @@ class ElectricityMarket(Model):
                 'RTO_costs': Array of RTO costs for each step
                 'GenCo_profits': 2D array of profits for each GenCo at each step
                 'mechanism': Mechanism used for this run
+                'agent_outcomes': List of outcomes for each agent, including revenue, profit, and whether they won the auction
         """
 
         # To start the model run,
@@ -268,12 +269,15 @@ class ElectricityMarket(Model):
             self.step()
 
         # Finally, we will return our "running tallies" of results into our expected 
-        # dict of arrays.
-        # a more Mesa-like approach would be simply to census the agents and return 
-        # their "outcomes" accumulations.
+        # dict of arrays. We can also return our accumlated "outcomes" for each agent.
+
+        agent_outcomes = []   
+        for agent in self.agents:
+            agent_outcomes.append(agent.outcomes)
 
         return {
             "RTO_costs": self.RTO_costs,
             "GenCo_profits": self.GenCo_profits,
             "mechanism": self.mechanism,
+            "agent_outcomes": agent_outcomes,
         }

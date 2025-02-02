@@ -69,5 +69,11 @@ class GenCoAgent(Agent):
         return bid
 
     def update_outcomes(self, revenues, profits):
-        """Update agent's revenue and profit"""
-        self.outcomes.append((revenues, profits))
+        """Update agent's revenue and profit for this step"""
+        self.revenue = revenues[self.i_n]
+        self.profit = profits[self.i_n]
+        self.outcomes.append({
+            'revenue': self.revenue,
+            'profit': self.profit,
+            'won_auction': self.revenue > 0  # Track if agent won this round
+        })

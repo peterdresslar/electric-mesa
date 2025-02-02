@@ -205,7 +205,7 @@ class ElectricityMarket(Model):
                 'RTO_costs': Array of RTO costs for each step
                 'GenCo_profits': 2D array of profits for each GenCo at each step
                 'mechanism': Mechanism used for this run
-                'agent_outcomes': List of outcomes for each agent, including revenue, profit, and whether they won the auction
+                'agent_outcomes': List of outcomes for each agent, including step, revenue, profit, and whether they won the auction
         """
 
         # To start the model run,

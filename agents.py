@@ -73,6 +73,7 @@ class GenCoAgent(Agent):
         self.revenue = revenues[self.i_n]
         self.profit = profits[self.i_n]
         self.outcomes.append({
+            'step': self.model.step_count,
             'revenue': self.revenue,
             'profit': self.profit,
             'won_auction': self.revenue > 0  # Track if agent won this round

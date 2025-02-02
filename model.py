@@ -142,7 +142,7 @@ class ElectricityMarket(Model):
         # The following code will organize the market side of bid generation.
 
         bids = np.zeros(self.n)
-        for i_n in range(self.n):
+        for i_n, agent in enumerate(self.agents):
             buffer = 0
             winners = []
             first_loser = None
@@ -157,7 +157,7 @@ class ElectricityMarket(Model):
 
             # now we use that market information to send to the agent to process a bid.
 
-            bids[i_n] = self.agents[i_n].generate_bid(
+            bids[i_n] = agent.generate_bid(
                 self.mechanism,
                 last_winner,
                 winners,

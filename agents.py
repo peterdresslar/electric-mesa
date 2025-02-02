@@ -7,114 +7,67 @@ class GenCoAgent(Agent):
     
     def __init__(
         self, 
-        unique_id: int, 
         model,
-        cost: float,
-        capacity: float,
-        error_factors: np.ndarray,
-        padding: float,
-        price_cap: float,
-        mechanism: str
+        mechanism: str,
+        i_n: int
     ):
-        super().__init__(unique_id, model)
-        self.cost = cost
-        self.capacity = capacity
-        self.error_factors = error_factors  # Expectations of other GenCos' costs
-        self.padding = padding  # Bidding strategy parameter
+        super().__init__(model)
         self.revenue = 0
         self.profit = 0
         self.quantity_supplied = 0
         self.outcomes = []
-        
-    def generate_bid(self, 
-                     mechanism, 
-                     N, 
-                     capacity_expectations, 
-                     cost_expectations, 
-                     expected_rankings, 
-                     padding, 
-                     costs):
-        """Generate bid based on mechanism type and demand"""
-        # this function is the ALMOST the same as the one in the source notebook
-        # we have slightly changed the function signature to match the agent's 
-        # initialization (and capture the model-computed variables)
-        # however, we are running on one agent at a time.
-        # and we will just pass back a single bid.
-        
-        bid = None
+        self.i_n = i_n # the ith agent of n agents
 
-        buffer = 0
-        winners = []
-        first_loser = None
-        for r in expected_rankings:
-            if buffer < N:
-                buffer += capacity_expectations[r]
-                winners.append(r)
-            else:
-                first_loser = r
-                break
-                
-        if not winners:
-            bid = self.model.price_cap
-            return(bid)
-            
-        last_winner = winners[-1]
+    # The agent-specific chunk of generate_bids() related to the bid
+    def generate_bid(
+        self, 
+        mechanism, 
+        last_winner,
+        winners,
+        first_loser,
+        price_cap,
+        costs,
+        cost_expectations,
+        paddings,
+    ):
+        """Generate a bid for the agent based on market position and expectations
         
-        # Generate bid based on mechanism
+        Args:
+            mechanism: Pricing mechanism ('uniform', 'discriminatory', or 'ownbid')
+            last_winner: Index of last winning agent in expected rankings
+            winners: List of winning agent indices
+            first_loser: Index of first losing agent
+            price_cap: Maximum allowed bid price
+            costs: Array of all agent costs
+            cost_expectations: 2D array of cost expectations (agent i's expectations for agent j)
+            paddings: Array of padding factors for each agent
+        """
+        i_n = self.i_n  # for convenience
+
+        # the following code is the same as the source notebook
         if mechanism == 'uniform':
             if not first_loser:
-                bid = self.model.price_cap
-            elif self.unique_id == last_winner:
-                bid = max(self.cost, 
-                        cost_expectations[first_loser] * padding)
+                bid = price_cap
+            elif i_n == last_winner:
+                bid = max(
+                    costs[i_n], cost_expectations[i_n, first_loser] * paddings[i_n])
             else:
-                bid = self.cost
+                bid = costs[i_n]
                 
         elif mechanism == 'discriminatory':
             if not first_loser:
-                bid = self.model.price_cap # fix
-            elif self.unique_id in winners:
-                bid = max(self.cost, 
-                        cost_expectations[first_loser] * padding)
+                bid = price_cap
+            elif i_n in winners:
+                bid = max(
+                    costs[i_n], cost_expectations[i_n, first_loser] * paddings[i_n])
             else:
-                bid = self.cost
+                bid = costs[i_n]
                 
-        else:  # ownbid
-            bid = self.cost
+        else:  # mechanism == 'ownbid'
+            bid = costs[i_n]
             
-        return(bid)
-        
+        return bid
 
-    def auction(self, N, bids, capacities):
-        """Run auction and return quantities and last price"""
-        # this function is the same as the one in the source notebook
-        request = N
-        quantities = np.zeros(self.model.n) # slightly changed to get the number of agents
-        bid_ranking = np.argsort(bids)
-        for i in bid_ranking:
-            if request > 0:
-                q = capacities[i]
-                if q < request:
-                    request -= q
-                    quantities[i] = q
-                else: 
-                    quantities[i] = request
-                    request = 0 
-                    last_price = bids[i]
-        return(quantities, last_price)
-
-
-    def outcomes(self, mechanism, last_price, bids, quantities, costs):
-        """Calculate revenue and profit for the agent"""
-        # this function is the same as the one in the source notebook
-        if mechanism == 'uniform':
-            revenues = last_price * quantities  
-        else:
-            revenues = bids * quantities
-        profits = revenues - costs * quantities
-        return(revenues, profits)
-
-    # NOT from the source notebook, this plugs the outcome into the "body" of the agent.
     def update_outcomes(self, revenues, profits):
         """Update agent's revenue and profit"""
         self.outcomes.append((revenues, profits))

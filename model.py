@@ -52,43 +52,25 @@ class ElectricityMarket(Model):
 
         self.rng = np.random.default_rng()  ## set up random number generator
 
-        # Generate costs and capacities
-        self.costs = self.rng.uniform(self.min_cost, self.max_cost, self.n)
-        self.capacities = self.m * self.costs + self.b
-        self.price_cap = max(self.costs) * self.cap_multiplier
-
-        # Generate agent expectations
-        errors = (
-            self.rng.uniform(self.min_error, self.max_error, self.n * self.n)
-            / 100
-            * np.random.choice([-1, 1], size=self.n * self.n)
-        ).reshape([self.n, self.n])
-        paddings = self.rng.uniform(self.min_padding, self.max_padding, self.n) / 100
-
-        # Create agents
-        for i_n in range(self.n):
-            agent = GenCoAgent(
-                unique_id=i_n,
-                model=self,
-                cost=self.costs[i_n],
-                capacity=self.capacities[i_n],
-                error_factors=errors[i_n],
-                padding=paddings[i_n],
-                price_cap=self.price_cap,  # Add model-level params
-                mechanism=self.mechanism,
-            )
-            self.register_agent(agent)
-
-
-        self.running = True
-        self.datacollector = None  # We can add this later for data collection
+        # Initialize arrays that will be populated in run_model()
+        self.costs = None
+        self.capacities = None
+        self.price_cap = None
+        self.errors = None
+        self.paddings = None # we depart from the source notebook with a pluralization.
 
         # Add results tracking
         self.RTO_costs = np.zeros(self.steps)  # Store RTO costs for each step
-        self.GenCo_profits = np.zeros(
-            (self.steps, self.n)
-        )  # Store profits for each GenCo at each step
+        self.GenCo_profits = np.zeros((self.steps, self.n))  # Store profits for each GenCo
+
+        # Initialize step counter
         self.step_count = 0
+
+    ### Helper functions ###
+    # The following two functions are taken from the source notebook
+    # and are used here to set up vectors that will be passed into the agent
+    # via step functions.
+    ##############################################################
 
     def find_capacities(self, prices, m, b):
         # precisely the function from the source notebook
@@ -105,6 +87,39 @@ class ElectricityMarket(Model):
             cost_expectations[g] = (1 + self.errors[g]) * costs
             expected_rankings[g] = np.argsort(cost_expectations[g])
         return (capacity_expectations, cost_expectations, expected_rankings)
+    
+    def auction(self, N, bids, capacities):
+        """Run auction and return quantities and last price"""
+        # this function is the same as the one in the source notebook
+        request = N
+        quantities = np.zeros(self.n) # slightly changed to get the number of agents
+        bid_ranking = np.argsort(bids)
+        for i in bid_ranking:
+            if request > 0:
+                q = capacities[i]
+                if q < request:
+                    request -= q
+                    quantities[i] = q
+                else: 
+                    quantities[i] = request
+                    request = 0 
+                    last_price = bids[i]
+        return(quantities, last_price)
+
+
+    def outcomes(self, mechanism, last_price, bids, quantities, costs):
+        """Calculate revenue and profit for the agent"""
+        # this function is the same as the one in the source notebook
+        if mechanism == 'uniform':
+            revenues = last_price * quantities  
+        else:
+            revenues = bids * quantities
+        profits = revenues - costs * quantities
+        return(revenues, profits)
+    
+    ### The Step Function ###
+    # Here we will run one step of the model.
+    ##############################################################
 
     def step(self):
         """Advance model by one step"""
@@ -122,37 +137,63 @@ class ElectricityMarket(Model):
         ##      bids = generate_bids(n, N, mechanism, capacity_expectations, 
         ##          cost_expectations, expected_rankings, padding, costs)
 
-        # recall that n is the number of agents, and N is the random demand we just generated
-        # instead of a function call within our model, we will run the step to our agents:
+        # Here, we will need to deart from the source notebook substatially,
+        # We have n agents with individual "generate_bid" logic.
+        # The following code will organize the market side of bid generation.
 
         bids = np.zeros(self.n)
+        for i_n in range(self.n):
+            buffer = 0
+            winners = []
+            first_loser = None
+            for r in self.expected_rankings[i_n]:
+                if buffer < N:
+                    buffer += self.capacities[r]
+                    winners.append(r)
+                else:
+                    first_loser = r
+                    break
+            last_winner = winners[-1]
 
-        for i, agent in enumerate(self.agents):
-            # note that all of our other params were initialized in the agent constructor:
-            bids[i] = agent.generate_bid(N)  
+            # now we use that market information to send to the agent to process a bid.
+
+            bids[i_n] = self.agents[i_n].generate_bid(
+                self.mechanism,
+                last_winner,
+                winners,
+                first_loser,
+                self.price_cap,
+                self.costs,
+                self.cost_expectations,
+                self.paddings,
+            )
 
             # now we need to run the auction:
             ##     quantities, last_price = auction(N, bids, capacities)
 
-            quantities, last_price = agent.run_auction(N, bids, self.capacities)
+        quantities, last_price = self.auction(N, bids, self.capacities)
 
             # now we need to calculate the revenue for each agent:
             ##     revenues, profits = outcomes(mechanism, last_price, bids, quantities, costs)
 
-            revenues, profits = agent.outcomes(
-                last_price=last_price,
-                bid=bids[i],
-                quantity=quantities[i]
-            )  # This line is pretty tricky, since we have a different cardinality of params
+        revenues, profits = self.outcomes(
+            mechanism=self.mechanism,
+            last_price=last_price,
+            bids=bids,
+            quantities=quantities,
+            costs=self.costs
+        )  # This line is pretty tricky, since we have a different cardinality of params
 
-            # And then finally we need to clean up into our result arrays:
-            ##     RTO_costs[s] = sum(revenues)
-            ##     GenCo_profits[s] = profits
+        # And then finally we need to clean up into our result arrays:
+        ##     RTO_costs[s] = sum(revenues)
+        ##     GenCo_profits[s] = profits
 
-            self.RTO_costs[self.step_count] += revenues  # Accumulate revenues
-            self.GenCo_profits[self.step_count, i] = profits  # Store individual profit
+        self.RTO_costs[self.step_count] = np.sum(revenues)  # Accumulate revenues
+        self.GenCo_profits[self.step_count] = profits  # Store individual profit
 
-            agent.update_outcomes((revenues, profits))
+        # let agents record their individual results
+        for i_n, agent in enumerate(self.agents):
+            agent.update_outcomes(revenues[i_n], profits[i_n])
 
         self.step_count += 1
 
@@ -166,12 +207,19 @@ class ElectricityMarket(Model):
                 'mechanism': Mechanism used for this run
         """
 
-        # here we are going to do some initialization similar to what the source notebook does
+        # To start the model run,
+        # we are going to do some initialization similar to the source notebook
         ##      costs = rng.uniform(min_cost, max_cost, n)
         ##      self.capacities = self.find_capacities(self.costs, self.m, self.b)
         ##      errors, paddings = self.create_expectations()
+        # however, rather than storing the results into arrays belonging to the model.
+        # we will "endow" our agents as we go along
 
+        # create the vector (ndarray) of costs. we store all of these vectors in the model
+        # so that we can pass them into the agent via step functions.
         self.costs = self.rng.uniform(self.min_cost, self.max_cost, self.n)
+
+        # create the vector (ndarray) of capacities
         self.capacities = self.find_capacities(
             self.costs, self.m, self.b
         )  # see function above
@@ -179,18 +227,15 @@ class ElectricityMarket(Model):
         ##  price_cap = max(costs) * cap_multiplier
         self.price_cap = max(self.costs) * self.cap_multiplier
 
-        ##      errors = (rng.uniform(min_error, max_error, n*n) / 100 * 
-        ##          np.random.choice([-1,1],size=n*n)).reshape([n,n])
+        ##      errors = (rng.uniform(min_error, max_error, n*n) / 100 
+        ##          * np.random.choice([-1,1],size=n*n)).reshape([n,n])
         ##      padding = rng.uniform(min_padding, max_padding, n) / 100
 
         self.errors = (
-            self.rng.uniform(self.min_error, self.max_error, self.n * self.n)
-            / 100
-            * np.random.choice([-1, 1], size=self.n * self.n)
-        ).reshape([self.n, self.n])
-        self.paddings = (
-            self.rng.uniform(self.min_padding, self.max_padding, self.n) / 100
-        )
+            self.rng.uniform(self.min_error, self.max_error, self.n * self.n) / 100
+                * np.random.choice([-1, 1], size=self.n * self.n)).reshape([self.n, self.n])    # noqa
+        self.paddings = self.rng.uniform(self.min_padding, self.max_padding, self.n) / 100      # noqa
+
 
         ##      capacity_expectations, cost_expectations, expected_rankings = 
         ##          create_expectations(n, capacities, costs)
@@ -204,6 +249,17 @@ class ElectricityMarket(Model):
             if mechanism not in ["uniform", "discriminatory", "ownbid"]:
                 raise ValueError(f"Invalid mechanism: {mechanism}")
             self.mechanism = mechanism
+
+        # Great. Now we can create our agents:
+        # Adding in any settings that we have not already set into vectorized arrays
+
+        for i_n in range(self.n):
+            agent = GenCoAgent(
+                self,
+                self.mechanism,
+                i_n=i_n
+            )
+            self.register_agent(agent)
 
         # and now we can run the model
 

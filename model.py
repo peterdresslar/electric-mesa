@@ -124,8 +124,8 @@ class ElectricityMarket(Model):
     def step(self):
         """Advance model by one step"""
         # telemetry back to the caller:
-        if self.step_count % 100 == 0:
-            print(f"Time: {self.step_count}")
+        # if self.step_count % 100 == 0:
+        #    print(f"Time: {self.step_count}")
 
         # commented code from the source notebook will have two hashes, like the following:
         ##      N = rng.uniform(int(np.mean(capacities)), int(np.sum(capacities)))
